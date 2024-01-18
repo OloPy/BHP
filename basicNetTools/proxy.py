@@ -28,21 +28,6 @@ debugModeGlob = False
 CONNECTION_TIMEOUT = 30
 
 
-def funcTimerDco(displayTimer=False):
-    def decorator(func):
-        def timer(*args, **kwargs):
-            myTimer = utils.Timer()
-            myTimer.start()
-            result = func(*args, **kwargs)
-            myTimer.stop()
-            delta = myTimer.result
-            if displayTimer:
-                print(f'\r{func.__name__} took {delta:0.4f}', end='')
-            return result
-        return timer
-    return decorator
-
-
 def manageArguments():
     """
     Function to parse arguments
@@ -60,7 +45,7 @@ def manageArguments():
     return parser.parse_args()
 
 
-@funcTimerDco(debugModeGlob)
+@utils.funcTimerDco(debugModeGlob)
 def hexDump(src, length=16, show=True):
     """
     This function manage the display of the data captured between customer and remote
@@ -90,7 +75,7 @@ def hexDump(src, length=16, show=True):
         return results
 
 
-@funcTimerDco(debugModeGlob)
+@utils.funcTimerDco(debugModeGlob)
 def proxyHandler(clientSocket: socket.socket, remoteHost: str, remotePort: int, receiveFirst=False):
     """
     This function will catch input trafic and transmit it after display. it call request and response handlers.
@@ -153,7 +138,7 @@ def proxyHandler(clientSocket: socket.socket, remoteHost: str, remotePort: int, 
         remoteSocket.close()
 
 
-@funcTimerDco(debugModeGlob)
+@utils.funcTimerDco(debugModeGlob)
 def receiveFrom(connection: socket.socket):
     """
     Manage reception of message from connection
@@ -175,7 +160,7 @@ def receiveFrom(connection: socket.socket):
     return buffer
 
 
-@funcTimerDco(debugModeGlob)
+@utils.funcTimerDco(debugModeGlob)
 def requestHandler(buffer):
     """
     A function to modify request before transmission to the remote. For now, it's empty
@@ -185,7 +170,7 @@ def requestHandler(buffer):
     return buffer
 
 
-@funcTimerDco(debugModeGlob)
+@utils.funcTimerDco(debugModeGlob)
 def responseHandler(buffer):
     """
     A function to modify response before sending to client
