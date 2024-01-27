@@ -1,7 +1,7 @@
-#!/bin/python3
 # -*-coding:Utf-8 -*
 
-"""this tool is a netcat clone in python3. All code came from blackhat python 2nd edition
+"""
+this tool is a netcat clone in python3. All code came from blackhat python 2nd edition
 See argparse help in main for usage.
 my modifications:
 - add doc strings for explainations
@@ -274,3 +274,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+

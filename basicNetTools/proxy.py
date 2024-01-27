@@ -1,6 +1,7 @@
 # -*-coding:Utf-8 -*
 
-"""this tool is a proxy in python3. All code came from blackhat python 2nd edition
+"""
+this tool is a proxy in python3. All code came from blackhat python 2nd edition
 See argparse help in main for usage.
 my modifications:
 - func and var rename for camel case
