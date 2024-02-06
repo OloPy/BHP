@@ -3,7 +3,16 @@
 """
 Code from Black Hat Python v2.
 this executes a command and revert to a server
+modified:
+- check IP and port
+to improve:
+- use of logging instead of print
+- add args managements
+- solve some encode issues
+
 """
+
+
 
 import getpass
 import paramiko
@@ -77,4 +86,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-    

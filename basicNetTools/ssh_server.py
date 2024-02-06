@@ -3,14 +3,23 @@
 """
 Code from Black Hat Python v2.
 this is a server to use with ssh_rcmd.py
+
+modified:
+- change IP to listen on 0.0.0.0
+- correct some encoding errors
+
+to improve:
+- key management
+- server auth
+- listening port ip
+- use of args
+- use of logging instead of print...
+- improve except
 """
 import os
 import paramiko
 import socket
-import sys
 import threading
-
-from pyPYPM import checkIfIp
 
 
 CWD = os.path.dirname(os.path.realpath(__file__))
@@ -21,14 +30,14 @@ class SSHServer (paramiko.ServerInterface):
     def __init__(self):
         self.event = threading.Event()
 
-    def check_channel_request(self, kind, chanid):
+    def check_channel_request(self, kind, chanId):
         if kind == 'session':
             return paramiko.OPEN_SUCCEEDED
         return paramiko.OPEN_FAILED_ADMINISTRATIVELY_PROHIBITED
 
     def check_auth_password(self, username, password):
         if (username == 'tim') and (password == 'sekret'):
-            return paramiko.AUTH_SUCCESFUL
+            return paramiko.AUTH_SUCCESSFUL
 
 
 def main():
