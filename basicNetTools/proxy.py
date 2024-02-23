@@ -11,18 +11,21 @@ my modifications:
 - correct indentation in handler for receive first
 - replacing args management by argparse func
 - removing serverLoop useless function
+- Handle HTTP with compression
 
 to do:
 - replace hexdump func by a display object to allow dump in file or display
-- handle http zipped trafic! most of the http trafic is gzipped or zipped. I need to find a way to handle this
+- Add compression method support for http
 """
 
-from pyPYPM import utils
 import argparse
+import gzip
 import socket
 import sys
 import textwrap
 import threading
+
+from pyPYPM import utils
 
 HEX_FILTER = ''.join([(len(repr(chr(i))) == 3) and chr(i) or '.' for i in range(256)])
 debugModeGlob = False
@@ -57,23 +60,65 @@ def hexDump(src, length=16, show=True):
     :return: a list named result
     """
     if isinstance(src, bytes):
+        if src.startswith(b'HTTP'):
+            header, http = manageHttp(src)
+            src = header + http
         try:
-            src = src.decode()
+            src = src.decode('utf-8')
         except UnicodeDecodeError as e:
-            print(f"Hexdump error: {e}")
-            pass
+            print(f"Hexdump error: {e}\n")
+            return None
     results = list()
     for i in range(0, len(src), length):
         word = str(src[i:i+length])
         printable = word.translate(HEX_FILTER)
         hexa = ' '.join([f'{ord(c):02X}' for c in word])
-        hexwidth = length*3
-        results.append(f'{i:04x}  {hexa:<{hexwidth}}  {printable}')
+        hexWidth = length * 3
+        results.append(f'{i:04x}  {hexa:<{hexWidth}}  {printable}')
     if show:
         for line in results:
             print(line)
     else:
         return results
+
+
+def findContentLen(byteObject: bytes)-> int:
+    """
+    Exctract content len from byte object
+    :param byteObject: the object containing contentlen
+    :return: a int
+    """
+    try:
+        beginingIndex = byteObject.index(b'Content-Length')+len(b'Content-Length: ')
+    except ValueError:
+        raise ValueError('findContentLen cant find Content-Length: maybe call error?')
+    delta = byteObject[beginingIndex:beginingIndex+10].find(b'\r')
+    if byteObject[beginingIndex:beginingIndex+delta].decode().isdecimal():
+        return int(byteObject[beginingIndex:beginingIndex+delta])
+    else:
+        raise ValueError('findContentLen cant find Content-Length: maybe call error?')
+
+
+def manageHttp(message: bytes) -> tuple:
+    """
+    We will handle http special case
+    :param message: the initial message
+    :return: an uncompressed message
+    """
+    contantLen = findContentLen(message)
+    hearderLen = len(message)-contantLen
+    header = message[:hearderLen]
+    httpCompressed = message[hearderLen:]
+    compressionField = [i for i in header.decode().split('\r\n') if i.startswith('Content-Encoding:')]
+    if len(compressionField) > 0:
+        compressionMethod = compressionField[0].split(' ')[1]
+    else:
+        compressionMethod = ''
+    if compressionMethod == 'gzip':
+        http = gzip.decompress(httpCompressed)
+    else:
+        http = b'Uncompress Error'
+    return header, http
 
 
 @utils.funcTimerDco(debugModeGlob)
@@ -187,11 +232,12 @@ def main():
     :return: None
     """
     myArgs = manageArguments()
+
     localHost = myArgs.localAddress
     localPort = myArgs.localPort
     remoteHost = myArgs.remoteAddress
     remotePort = myArgs.remotePort
-    receiveFirt = myArgs.receiveFirst
+    receiveFirst = myArgs.receiveFirst
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     try:
@@ -215,7 +261,7 @@ def main():
                     clientSocket,
                     remoteHost,
                     int(remotePort),
-                    receiveFirt
+                    receiveFirst
                 )
             )
             proxyThread.start()
