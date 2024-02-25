@@ -8,10 +8,9 @@ import ipaddress
 import os
 import socket
 import struct
+import sys
 
 from ctypes import *
-# Host to listen on
-HOST = '172.22.150.84'
 
 
 class IPCtypes(Structure):
@@ -32,9 +31,8 @@ class IPCtypes(Structure):
     def __new__(cls, socket_buffer=None):
         return cls.from_buffer_copy(socket_buffer)
 
-    def __init__(self, socket_buffer=None, *args: Any, **kw: Any):
+    def __init__(self, socket_buffer=None):
         # human readable IP address
-        super().__init__(*args, **kw)
         self.src_address = socket.inet_ntoa(struct.pack("<L", self.src))
         self.dst_address = socket.inet_ntoa(struct.pack("<L", self.dst))
 
@@ -80,11 +78,33 @@ def sniff(host):
         sniffer.ioctl(socket.SIO_RCVALL, socket.RCVALL_ON)
 
     # read packet
-    print(sniffer.recvfrom(65565))
+    try:
+        print(f'Starting listen on {host}')
+        while True:
+            # read packet
+            raw_buffer = sniffer.recvfrom(65535)[0]
+            # create an IP header from first 20 bytes
+            ip_header_struct = IPStruct(raw_buffer[:20])
+            # print the detected protocol
+            toPrint = f'Protocol cType: {ip_header_struct.protocol} {ip_header_struct.src_address}'
+            toPrint += f' -> {ip_header_struct.dst_address}'
+            print(toPrint)
+    except KeyboardInterrupt:
+        # stopping capture with Ctrl+c
+        # if we're on windows, turn off promiscious mode
+        if os.name == 'nt':
+            sniffer.ioctl(socket.SIO_RCVALL, socket.RCVALL_OFF)
+        print('End of capture.')
+        exit(0)
 
-    # if we're on windows, turn off promiscious mode
-    if os.name == 'nt':
-        sniffer.ioctl(socket.SIO_RCVALL, socket.RCVALL_OFF)
+
+def main():
+    # Host to listen on
+    if len(sys.argv) == 2:
+        host = sys.argv[1]
+    else:
+        host = '127.0.0.1'
+    sniff(host)
 
 
 if __name__ == '__main__':
