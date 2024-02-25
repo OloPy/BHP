@@ -2,6 +2,15 @@
 
 """
 This is a basic sniffer from BHP book
+on linux, with wifi:
+root@xflyer2:~ # ip link set wlo1 down
+root@xflyer2:~ # iw wlo1 set monitor none
+root@xflyer2:~ # ip link set wlo1 up
+
+To reactivate:
+root@xflyer2:~ # ip link set wlo1 down
+root@xflyer2:~ # iw wlo1 set type managed
+root@xflyer2:~ # ip link set wlo1 up
 
 """
 import ipaddress
