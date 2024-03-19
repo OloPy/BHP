@@ -13,40 +13,15 @@ root@xflyer2:~ # iw wlo1 set type managed
 root@xflyer2:~ # ip link set wlo1 up
 
 """
+
 import ipaddress
 import os
 import socket
 import struct
 import sys
 
-from ctypes import *
 
-
-class IPCtypes(Structure):
-    _fields_ = [
-        ("version",      c_ubyte,  4),   # 4 bit unsigned char
-        ("ihl",          c_ubyte,  4),   # 4 bit unsigned char
-        ("tos",          c_ubyte,  8),   # 1 byte char
-        ("len",          c_ushort, 16),  # 2 byte unsigned short
-        ("id",           c_ushort, 16),  # 2 byte unsigned short
-        ("offset",       c_ushort, 16),  # 2 byte unsigned short
-        ("ttl",          c_ubyte,  8),   # 1 byte char
-        ("protocol_num", c_ubyte,  8),   # 1 byte char
-        ("sum",          c_ushort, 16),  # 2 byte unsigned short
-        ("src",          c_uint32, 32),  # 4 byte unsigned int
-        ("dst",          c_uint32, 32),  # 4 byte unsigned int
-    ]
-
-    def __new__(cls, socket_buffer=None):
-        return cls.from_buffer_copy(socket_buffer)
-
-    def __init__(self, socket_buffer=None):
-        # human readable IP address
-        self.src_address = socket.inet_ntoa(struct.pack("<L", self.src))
-        self.dst_address = socket.inet_ntoa(struct.pack("<L", self.dst))
-
-
-class IPStruct:
+class IP:
     def __init__(self, buff=None):
         header = struct.unpack('<BBHHHBBH4s4s', buff)
         self.ver = header[0] >> 4
@@ -72,7 +47,17 @@ class IPStruct:
             self.protocol = str(self.protocol_num)
 
 
-def sniff(host: str) -> None:
+class ICMP:
+    def __init__(self, buff):
+        header = struct.unpack('<BBHHH', buff)
+        self.type = header[0]
+        self.code = header[1]
+        self.sum = header[2]
+        self.id = header[3]
+        self.seq = header[4]
+
+
+def sniff(host) -> None:
     # Create a raw socket, bin to public interface
     if os.name == 'nt':
         socket_protocol = socket.IPPROTO_IP
@@ -93,11 +78,18 @@ def sniff(host: str) -> None:
             # read packet
             raw_buffer = sniffer.recvfrom(65535)[0]
             # create an IP header from first 20 bytes
-            ip_header_struct = IPStruct(raw_buffer[:20])
-            # print the detected protocol
-            toPrint = f'Protocol cType: {ip_header_struct.protocol} {ip_header_struct.src_address}'
-            toPrint += f' -> {ip_header_struct.dst_address}'
-            print(toPrint)
+            ip_header = IP(raw_buffer[:20])
+            if ip_header.protocol == 'ICMP':
+                toPrint = f'Protocol: {ip_header.protocol} {ip_header.src_address} -> {ip_header.dst_address}'
+                print(toPrint)
+                print(f'Version: {ip_header.ver}')
+                print(f'Header length: {ip_header.ihl} TTL: {ip_header.ttl}')
+                # Calculate where our ICMP packet starts
+                offset = ip_header.ihl * 4
+                buf = raw_buffer[offset:offset + 8]
+                # create our ICMP structure
+                icmp_header = ICMP(buf)
+                print(f'ICMP -> Type: {icmp_header.type} Code: {icmp_header.code}\n')
     except KeyboardInterrupt:
         # stopping capture with Ctrl+c
         # if we're on windows, turn off promiscious mode
