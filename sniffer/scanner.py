@@ -1,8 +1,8 @@
 # -*-coding:Utf-8 -*
 
 """
-This is a basic sniffer from BHP book
-on linux, with wifi:
+This is a network scanner from BHP book.
+on linux, with wi-fi:
 root@xflyer2:~ # ip link set wlo1 down
 root@xflyer2:~ # iw wlo1 set monitor none
 root@xflyer2:~ # ip link set wlo1 up
@@ -12,6 +12,11 @@ root@xflyer2:~ # ip link set wlo1 down
 root@xflyer2:~ # iw wlo1 set type managed
 root@xflyer2:~ # ip link set wlo1 up
 
+Improvement:
+- add parameters to manage subnet and message
+- get current subnet as default
+- MESSAGE and SUBNET are global var. I want to modify them to be init in scanner object
+
 """
 
 import ipaddress
@@ -19,6 +24,14 @@ import os
 import socket
 import struct
 import sys
+import threading
+import time
+
+
+# Target subnet
+SUBNET = "10.66.20.0/24"
+# magic string we'll check ICMP response for
+MESSAGE = "Python3Rules!"
 
 
 class IP:
@@ -43,7 +56,7 @@ class IP:
         try:
             self.protocol = self.protocol_map[self.protocol_num]
         except KeyError as err:
-            print(f'Protocl number not recognized: {self.protocol_num}, {err}')
+            print(f'Protocol number not recognized: {self.protocol_num}, {err}')
             self.protocol = str(self.protocol_num)
 
 
@@ -57,46 +70,68 @@ class ICMP:
         self.seq = header[4]
 
 
-def sniff(host) -> None:
-    # Create a raw socket, bin to public interface
-    if os.name == 'nt':
-        socket_protocol = socket.IPPROTO_IP
-    else:
-        socket_protocol = socket.IPPROTO_ICMP
-    sniffer = socket.socket(socket.AF_INET, socket.SOCK_RAW, socket_protocol)
-    sniffer.bind((host, 0))
-    # Include IP header in capture
-    sniffer.setsockopt(socket.IPPROTO_IP, socket.IP_HDRINCL, 1)
+def udpSender():
+    """
+    this sprays out UDP datagrams with our magic message
+    """
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sender:
+        for ip in ipaddress.ip_network(SUBNET).hosts():
+            sender.sendto(bytes(MESSAGE, 'utf-8'), (str(ip), 65212))
 
-    if os.name == 'nt':
-        sniffer.ioctl(socket.SIO_RCVALL, socket.RCVALL_ON)
 
-    # read packet
-    try:
-        print(f'Starting listen on {host}')
-        while True:
-            # read packet
-            raw_buffer = sniffer.recvfrom(65535)[0]
-            # create an IP header from first 20 bytes
-            ip_header = IP(raw_buffer[:20])
-            if ip_header.protocol == 'ICMP':
-                toPrint = f'Protocol: {ip_header.protocol} {ip_header.src_address} -> {ip_header.dst_address}'
-                print(toPrint)
-                print(f'Version: {ip_header.ver}')
-                print(f'Header length: {ip_header.ihl} TTL: {ip_header.ttl}')
-                # Calculate where our ICMP packet starts
-                offset = ip_header.ihl * 4
-                buf = raw_buffer[offset:offset + 8]
-                # create our ICMP structure
-                icmp_header = ICMP(buf)
-                print(f'ICMP -> Type: {icmp_header.type} Code: {icmp_header.code}\n')
-    except KeyboardInterrupt:
-        # stopping capture with Ctrl+c
-        # if we're on windows, turn off promiscious mode
+class Scanner:
+    def __init__(self, host):
+        self.host = host
         if os.name == 'nt':
-            sniffer.ioctl(socket.SIO_RCVALL, socket.RCVALL_OFF)
-        print('End of capture.')
-        exit(0)
+            socket_protocol = socket.IPPROTO_IP
+        else:
+            socket_protocol = socket.IPPROTO_ICMP
+        self.socket = socket.socket(socket.AF_INET, socket.SOCK_RAW, socket_protocol)
+        self.socket.bind((host, 0))
+        self.socket.setsockopt(socket.IPPROTO_IP, socket.IP_HDRINCL, 1)
+        if os.name == 'nt':
+            self.socket.ioctl(socket.SIO_RCVALL, socket.RCVALL_ON)
+
+    def sniff(self):
+        hosts_up = {f'{str(self.host)} *'}
+        try:
+            while True:
+                # read packet
+                raw_buffer = self.socket.recvfrom(65535)[0]
+                # create an IP header from first 20 bytes
+                ip_header = IP(raw_buffer[:20])
+                if ip_header.protocol == 'ICMP':
+                    toPrint = f'Protocol: {ip_header.protocol} {ip_header.src_address} -> {ip_header.dst_address}'
+                    print(toPrint)
+                    print(f'Version: {ip_header.ver}')
+                    print(f'Header length: {ip_header.ihl} TTL: {ip_header.ttl}')
+                    # Calculate where our ICMP packet starts
+                    offset = ip_header.ihl * 4
+                    buf = raw_buffer[offset:offset + 8]
+                    # create our ICMP structure
+                    icmp_header = ICMP(buf)
+                    print(f'ICMP -> Type: {icmp_header.type} Code: {icmp_header.code}\n')
+                    if icmp_header.code == 3 and icmp_header.type == 3:
+                        if ipaddress.ip_address(ip_header.src_address) in ipaddress.IPv4Network(SUBNET):
+                            # make sure it as our magic message
+                            if raw_buffer[len(raw_buffer) - len(MESSAGE):] == bytes(MESSAGE, 'utf-8'):
+                                tgt = str(ip_header.src_address)
+                                if tgt != self.host and tgt not in hosts_up:
+                                    hosts_up.add(str(ip_header.src_address))
+                                    print(f'Host Up: {tgt}')
+        # handle Ctrl+c
+        except KeyboardInterrupt:
+            # stopping capture with Ctrl+c
+            # if we're on windows, turn off promiscuous mode
+            if os.name == 'nt':
+                self.socket.ioctl(socket.SIO_RCVALL, socket.RCVALL_OFF)
+            print('\n User interrupted.')
+            if hosts_up:
+                print(f'\n\nSummary: Hosts up in {SUBNET}:')
+                for host in sorted(hosts_up):
+                    print(f'\t- {host}')
+            print('')
+            exit(0)
 
 
 def main() -> None:
@@ -105,7 +140,11 @@ def main() -> None:
         host = sys.argv[1]
     else:
         host = '127.0.0.1'
-    sniff(host)
+    s = Scanner(host)
+    time.sleep(5)
+    t = threading.Thread(target=udpSender)
+    t.start()
+    s.sniff()
 
 
 if __name__ == '__main__':
