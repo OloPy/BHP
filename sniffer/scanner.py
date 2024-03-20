@@ -12,7 +12,11 @@ root@xflyer2:~ # ip link set wlo1 down
 root@xflyer2:~ # iw wlo1 set type managed
 root@xflyer2:~ # ip link set wlo1 up
 
-Improvement:
+Improvement done:
+- default address is the first found
+- add messages
+
+Improvement to do:
 - add parameters to manage subnet and message
 - get current subnet as default
 - MESSAGE and SUBNET are global var. I want to modify them to be init in scanner object
@@ -101,16 +105,11 @@ class Scanner:
                 # create an IP header from first 20 bytes
                 ip_header = IP(raw_buffer[:20])
                 if ip_header.protocol == 'ICMP':
-                    toPrint = f'Protocol: {ip_header.protocol} {ip_header.src_address} -> {ip_header.dst_address}'
-                    print(toPrint)
-                    print(f'Version: {ip_header.ver}')
-                    print(f'Header length: {ip_header.ihl} TTL: {ip_header.ttl}')
                     # Calculate where our ICMP packet starts
                     offset = ip_header.ihl * 4
                     buf = raw_buffer[offset:offset + 8]
                     # create our ICMP structure
                     icmp_header = ICMP(buf)
-                    print(f'ICMP -> Type: {icmp_header.type} Code: {icmp_header.code}\n')
                     if icmp_header.code == 3 and icmp_header.type == 3:
                         if ipaddress.ip_address(ip_header.src_address) in ipaddress.IPv4Network(SUBNET):
                             # make sure it as our magic message
@@ -139,11 +138,15 @@ def main() -> None:
     if len(sys.argv) == 2:
         host = sys.argv[1]
     else:
-        host = '127.0.0.1'
+        host = socket.gethostbyname(socket.gethostname())
+    print(f'[+] Using {host} as source host.')
     s = Scanner(host)
+    print(f'[!] Waiting 5 sec.')
     time.sleep(5)
+    print(f'[!] Starting UDP send.')
     t = threading.Thread(target=udpSender)
     t.start()
+    print(f'[!] Starting sniffer.')
     s.sniff()
 
 
