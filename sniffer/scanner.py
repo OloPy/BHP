@@ -16,8 +16,8 @@ Improvement done:
 - default address is the first found
 - add parameters to manage subnet, message and source IP
 
-Improvement to do:
-
+Improvement todo:
+- search ARP of found IP
 """
 
 import argparse
