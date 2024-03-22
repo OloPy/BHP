@@ -16,7 +16,7 @@ Improvement done:
 - default address is the first found
 - add parameters to manage subnet, message and source IP
 
-Improvement todo:
+Improvement to do:
 - search ARP of found IP
 """
 
