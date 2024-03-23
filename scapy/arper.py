@@ -58,7 +58,7 @@ class Arper:
         self.interface = interface
         self.file = file
         self.count = count
-        conf.iface = interface
+        conf.iface = self.interface
         conf.verb = 0
         print(f'Initialized {self.interface}:')
         print(f'\tGateway ({self.gateway} is at {self.gatewaymac}.')
@@ -140,7 +140,7 @@ class Arper:
 
 def main():
     myArgs = manageArguments()
-    myArp = Arper(myArgs.victim, myArgs.gateway, myArgs.nic, myArgs.count)
+    myArp = Arper(myArgs.victim, myArgs.gateway, myArgs.output, myArgs.nic, myArgs.count)
     myArp.run()
 
 
