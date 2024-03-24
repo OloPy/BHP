@@ -4,6 +4,10 @@
 Recapper.py from BHP book
 
 this program search in pcap file images sent and save them to disk.
+A nice test:
+- generate a pcap file
+    tcpdump -i wlo1 -s 65535 -w packet.pcap
+- site to visit: http://www.josephwcarrillo.com/
 
 improvement done:
 
@@ -31,25 +35,59 @@ def get_header(payload):
         sys.stdout.write('-')
         sys.stdout.flush()
         return None
-    header = dict(re.findall(r'(?P<name>.*?): (?P<value>.*?)\n\r', header_raw.decode()))
+    header = dict(re.findall(r'(?P<name>.*?): (?P<value>.*?)\r\n', header_raw.decode()))
     if 'Content-Type' not in header:
         return None
     return header
 
 
 def extract_content(Response, content_name='image'):
-    pass
+    content, content_type = None, None
+    if content_name in Response.header['Content-Type']:
+        content_type = Response.header['Content-Type'].split('/')[1]
+        content = Response.payload[Response.payload.index(b'\r\n\r\n')+4:]
+        if 'Content-Encoding' in Response.header:
+            if Response.header['Content-Encoding'] == 'gzip':
+                content = zlib.decompress(Response.payload, zlib.MAX_WBITS | 32)
+            elif Response.header['Content-Encoding'] == 'deflate':
+                content = zlib.decompress(Response.payload)
+    return content, content_type
 
 
 class Recapper:
     def __init__(self, fname):
-        pass
+        pcap = rdpcap(fname)
+        self.sessions = pcap.sessions()
+        self.responses = list()
 
     def get_responses(self):
-        pass
+        print(f'We have {len(self.sessions)} sessions.')
+        for session in self.sessions:
+            payload = b''
+            for packet in self.sessions[session]:
+                try:
+                    if packet[TCP].dport == 80 or packet[TCP].sport == 80:
+                        payload += bytes(packet[TCP].payload)
+                except IndexError:
+                    print('_', end='')
+                #else:
+                    #print('X', end='')
+            if payload:
+                header = get_header(payload)
+                if header is None:
+                    continue
+                self.responses.append(Response(header=header, payload=payload))
+                print('F', end='')
+        print('\n')
 
     def write(self, content_name):
-        pass
+        for i, response in enumerate(self.responses):
+            content, content_type = extract_content(response, content_name)
+            if content and content_type:
+                ofname = os.path.join(OUTDIR, f'ex_{i}.{content_type}')
+                print(f'Writing {ofname} on disk.')
+                with open(ofname, 'wb') as f:
+                    f.write(content)
 
 
 def main():
