@@ -7,12 +7,13 @@ Improvement done:
 - add argparse to manage arguments
 - add parameter for output file
 - move output file default path to user home
+- removing get_if_hwaddr and sndrcv from import
 
 Improvement to do:
 - display to improve
 """
 from multiprocessing import Process
-from scapy.all import ARP, Ether, conf, get_if_hwaddr, send, sniff, sndrcv, srp, wrpcap
+from scapy.all import ARP, Ether, conf, send, sniff, srp, wrpcap
 
 import argparse
 import os
@@ -26,10 +27,10 @@ def manageArguments() -> argparse.Namespace:
     :return: a parse_args object
     """
     if os.name == 'nt':
-        homePath = os.environ["USERPROFILE"]+'\\\\'
+        homePath = os.environ["USERPROFILE"]
     else:
-        homePath = os.environ["HOME"] + '/'
-    defaultFile = homePath+'packet.pcap'
+        homePath = os.environ["HOME"]
+    defaultFile = os.path.join(homePath, 'packet.pcap')
     parser = argparse.ArgumentParser(
         description='BHP ARP poisoner.\n Need root or administrator right.',
         formatter_class=argparse.RawDescriptionHelpFormatter,
