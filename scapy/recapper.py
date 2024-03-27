@@ -38,22 +38,25 @@ def manageArguments() -> argparse.Namespace:
         sourcePath = os.path.join(os.environ["TEMP"], "BHP")
     else:
         sourcePath = '/tmp/BHP'
-    if not os.path.exists(sourcePath):
-        os.mkdir(sourcePath)
     defaultFile = os.path.join(sourcePath, 'packet.pcap')
-    outputDir = os.path.join(sourcePath, 'output')
+    outputDir = os.path.join(sourcePath, 'images')
     parser = argparse.ArgumentParser(
         description='BHP recapper. this script is used to recover data from pcap file.\n Need root or administrator '
                     'right.',
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog='Example: python3 proxy.py -s /tmp/BHP/packet.pcap -o /tmp/BHP/outPut \n')
+        epilog='Example: python3 recapper.py -s /tmp/BHP/packet.pcap -o /tmp/BHP/images \n')
     parser.add_argument(
         '-s',
         '--sourceFile',
         default=defaultFile,
-        help=f'The pcap file with datas. default is {defaultFile}'
+        help=f'The pcap file with datas. Default is {defaultFile}'
     )
-    parser.add_argument('-o', '--outputDir', default=outputDir, help='The folder where datas are saved.')
+    parser.add_argument(
+        '-o',
+        '--outputDir',
+        default=outputDir,
+        help=f'The folder where datas are saved. Default is {outputDir}'
+    )
     return parser.parse_args()
 
 
@@ -123,9 +126,17 @@ class Recapper:
 
 def main():
     myArgs = manageArguments()
+    try:
+        if not os.path.exists(myArgs.sourceFile):
+            os.makedirs(myArgs.sourceFile)
+        if not os.path.exists(myArgs.outputDir):
+            os.makedirs(myArgs.outputDir)
+    except PermissionError as Perr:
+        print(f'You are not allowed to create {Perr.filename}!')
+        exit(1)
     print(f"Extracting data from {myArgs.sourceFile}")
-    pcapfile = myArgs.sourceFile
-    recapper = Recapper(pcapfile)
+    pcapFile = myArgs.sourceFile
+    recapper = Recapper(pcapFile)
     recapper.get_responses()
     print(f"Saving data to {myArgs.outputDir}")
     recapper.write('image', myArgs.outputDir)
