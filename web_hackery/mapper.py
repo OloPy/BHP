@@ -8,6 +8,8 @@ improvement to do:
 - manage script args with argparse
 - modify default path
 - modify some variables names
+- Add count for found entries
+- add % of done with a tread
 """
 
 import contextlib
@@ -19,14 +21,15 @@ import threading
 import time
 
 FILTERED = [".jpg", ".gif", ".png", ".css"]
-TARGET = "http://boodelyboo.com:8080/"
-THREAD = 10
+TARGET = "http://boodelyboo.com/"
+THREADS = 10
 
 answers = queue.Queue()
 web_paths = queue.Queue()
 
 
 def gather_paths():
+    i = 0
     for root, _, files in os.walk('.'):
         for fname in files:
             if os.path.splitext(fname)[1] in FILTERED:
@@ -36,6 +39,8 @@ def gather_paths():
                 path = path[1:]
             print(path)
             web_paths.put(path)
+            i += 1
+    print(f'Found {i} path!')
 
 
 @contextlib.contextmanager
@@ -52,10 +57,44 @@ def chdir(path):
         os.chdir(this_dir)
 
 
+def manageArgs():
+    pass
+
+
+def run():
+    myThreads = list()
+    for i in range(THREADS):
+        print(f'Spawning thread {i}')
+        t = threading.Thread(target=test_remote)
+        myThreads.append(t)
+        t.start()
+    for thread in myThreads:
+        thread.join()
+
+
+def test_remote():
+    while not web_paths.empty():
+        path = web_paths.get()
+        url = f'{TARGET}{path}'
+        time.sleep(2)
+        r = requests.get(url)
+        if r.status_code == 200:
+            answers.put(url)
+            sys.stdout.write('+')
+        else:
+            sys.stdout.write('-')
+        sys.stdout.flush()
+
+
 def main():
     with chdir("/tmp/BHP/wp/wordpress"):
         gather_paths()
     input('Press return to continue.')
+    run()
+    with open('/tmp/BHP/myanswer.txt', 'w') as f:
+        while not answers.empty():
+            f.write(f'{answers.get()}\n')
+    print('Done!')
 
 
 if __name__ == '__main__':
