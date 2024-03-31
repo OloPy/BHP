@@ -1,0 +1,3 @@
+Command to run container:
+sudo docker-compose -f wp_mysql_compose.yml up -d
+Edit /etc/hosts to add boodelyboo.com
