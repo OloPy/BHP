@@ -9,10 +9,10 @@ improvement done:
 - Add count for found entries
 - add % of done with a tread
 - check if it's a wordpress
+- allow ctrl-c to stop process
 
 improvement to do:
 - add filter arg to reduce numbers of paths
-- allow ctrl-c to stop process
 """
 
 import argparse
@@ -23,100 +23,14 @@ import requests
 import threading
 import time
 
+from pyPYPM import utils
+
 FILTERED = [".jpg", ".gif", ".png", ".css"]
 PROGRESS = 0
 URIFOUND = 0
 
 answers = queue.Queue()
 web_paths = queue.Queue()
-
-# lambda
-percent = lambda max, value: float(f"{(value * 100) / max:.2f}")
-
-
-class ProgressBar:
-    """
-    Object progress bar
-    """
-    def __init__(
-            self,
-            maxValue: int,
-            startValue: int = 0,
-            step: int = 1,
-            beforeStr: str = 'Progress: ',
-            startChar: str = '|',
-            progressChar: str = 'O',
-            toDoChar: str = ' ',
-            endChar: str = '|',
-            afterStr: str = '',
-            displayPercent: bool = True
-    ):
-        """
-        The object init
-        :param maxValue:
-        :param startValue:
-        :param step:
-        :param beforeStr:
-        :param startChar:
-        :param progressChar:
-        :param toDoChar:
-        :param endChar:
-        :param afterStr:
-        :param displayPercent:
-        """
-        self.maxValue = maxValue
-        self.stateValue = startValue
-        self.step = step
-        self.statePercent = int()
-        self.updatePercent()
-        self.beforeStr = beforeStr
-        self.startChar = startChar
-        self.progressChar = progressChar
-        self.toDoChar = toDoChar
-        self.endChar = endChar
-        self.afterStr = afterStr
-        self.displayPercent = displayPercent
-
-    def updateStateValue(self, newValue: int):
-        """
-        Set the state value and update percents
-        :param newValue: the new value of the progress bar
-        """
-        self.stateValue = newValue
-        self.updatePercent()
-
-    def increment(self):
-        """
-        Increment value by step
-        """
-        self.stateValue += self.step
-        if self.stateValue > self.maxValue:
-            self.stateValue = self.maxValue
-        self.updatePercent()
-
-    def updatePercent(self):
-        """
-        update percent value based on other value
-        """
-        self.statePercent = int(percent(self.maxValue, self.stateValue))
-
-    def __repr__(self):
-        """
-        We define here the representation of the object. The string start by \r to restart from begining.
-        Use end='' option for print on the same line.
-        :return: a string to represent the progress bar
-        """
-        toPrint = '\r'
-        toPrint += self.beforeStr
-        toPrint += self.startChar
-        toPrint += self.progressChar * self.statePercent
-        totoValue = 100 - self.statePercent
-        toPrint += self.toDoChar * totoValue
-        toPrint += self.endChar
-        if self.displayPercent:
-            toPrint += f' {self.statePercent} % '
-        toPrint += self.afterStr
-        return toPrint
 
 
 @contextlib.contextmanager
@@ -137,7 +51,10 @@ def checkIfTargetIsWordpress(url: str) -> int:
     """
     Check if URL can be joined and if it's a wordpress. Return 0 if all is ok, 1 if cant be joined and 2 if not a wp
     """
-    answer = requests.get(url)
+    try:
+        answer = requests.get(url)
+    except requests.exceptions.ConnectionError:
+        return 1
     if answer.status_code != 200:
         return 1
     if answer.text.find('WordPress') == -1:
@@ -190,7 +107,7 @@ def manageArgs() -> argparse.Namespace:
 def printStatus(maximum: int, threads: int) -> None:
     global PROGRESS
     global URIFOUND
-    checkUrlProgress = ProgressBar(maximum, afterStr=f'of {maximum} ')
+    checkUrlProgress = utils.ProgressBar(maximum, afterStr=f'of {maximum} ')
     while not web_paths.empty():
         checkUrlProgress.updateStateValue(PROGRESS)
         print(f'{checkUrlProgress}', end='')
@@ -202,16 +119,20 @@ def printStatus(maximum: int, threads: int) -> None:
 def run(target: str, threads: int, maximum: int) -> None:
     myThreads = list()
     print(f'Spawning thread: ', end=" ")
-    for i in range(threads):
-        print(i, end=" ")
-        t = threading.Thread(target=test_remote, args=[target,])
-        myThreads.append(t)
-        t.start()
-    progressThread = threading.Thread(target=printStatus, args=[maximum, threads])
-    myThreads.append(progressThread)
-    progressThread.start()
-    for thread in myThreads:
-        thread.join()
+    try:
+        for i in range(threads):
+            print(i, end=" ")
+            t = threading.Thread(target=test_remote, args=[target,])
+            myThreads.append(t)
+            t.start()
+        progressThread = threading.Thread(target=printStatus, args=[maximum, threads])
+        myThreads.append(progressThread)
+        progressThread.start()
+        for thread in myThreads:
+            thread.join()
+    except KeyboardInterrupt:
+        print("User stop process!")
+        web_paths.queue.clear()
 
 
 def test_remote(target: str) -> None:
