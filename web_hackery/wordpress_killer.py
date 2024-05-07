@@ -10,7 +10,7 @@ To improve:
 - add arguments
 - review redirect
 - add retry
-- handle multi language
+- handle multi-language
 """
 import queue
 from io import BytesIO
