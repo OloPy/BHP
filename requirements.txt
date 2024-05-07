@@ -6,6 +6,7 @@ charset-normalizer==3.3.2
 crypto==1.4.1
 cryptography==42.0.2
 idna==3.6
+lxml==5.2.1
 Naked==0.1.32
 numpy==1.26.4
 opencv-python==4.9.0.80
